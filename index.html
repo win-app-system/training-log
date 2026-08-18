@@ -290,7 +290,7 @@ body{
   bottom:0;
   background:var(--plate);
   border-top:1px solid var(--brass);
-  padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+  padding:10px calc(24px + env(safe-area-inset-left)) calc(10px + env(safe-area-inset-bottom)) calc(24px + env(safe-area-inset-right));
   z-index:100;
   box-shadow:0 -4px 12px rgba(0,0,0,0.3);
 }
@@ -318,7 +318,7 @@ body{
 }
 .fixed-timer-bar.alert .rest-time{color:var(--danger);}
 .rest-btn{
-  padding:10px 14px;
+  padding:10px 12px;
   border-radius:var(--radius);
   border:none;
   font-size:12px;
