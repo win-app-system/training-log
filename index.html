@@ -276,6 +276,9 @@ body{
 }
 .footer-note{text-align:center;font-size:10px;color:var(--steel);margin-top:24px;letter-spacing:1px;}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div class="app">
@@ -297,10 +300,23 @@ body{
   <div id="view-menu" style="display:none"></div>
   <div id="view-history" style="display:none"></div>
 
-  <div class="footer-note">データはこの端末のブラウザ内に保存されます</div>
+  <div class="footer-note" id="syncStatus">クラウドに接続中...</div>
 </div>
 
 <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBY7pRjPv_ICL19r1IyZIAa-WEDB9H0j_w",
+  authDomain: "training-log-40fc1.firebaseapp.com",
+  projectId: "training-log-40fc1",
+  storageBucket: "training-log-40fc1.firebasestorage.app",
+  messagingSenderId: "47583643754",
+  appId: "1:47583643754:web:c2898537e398d2af09a213"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+let userDocRef = null;
+
 let state = {
   exerciseList: [],   // [{id,name,target}]
   sessions: [],
@@ -308,37 +324,49 @@ let state = {
   timerHandle: null
 };
 
-// ---------- storage (このiPhone・このブラウザ内に保存) ----------
-const LS_PREFIX = 'trainingLog:';
+// ---------- storage (Firebase Firestore にクラウド保存) ----------
+async function ensureAuth(){
+  return new Promise((resolve, reject)=>{
+    auth.onAuthStateChanged(user=>{
+      if(user){
+        userDocRef = db.collection('trainLogUsers').doc(user.uid);
+        resolve();
+      }
+    });
+    auth.signInAnonymously().catch(reject);
+  });
+}
+
 async function loadAll(){
   try{
-    const m = localStorage.getItem(LS_PREFIX+'exerciseList');
-    state.exerciseList = m ? JSON.parse(m) : defaultExerciseList();
-  }catch(e){ state.exerciseList = defaultExerciseList(); }
-  try{
-    const s = localStorage.getItem(LS_PREFIX+'sessions');
-    state.sessions = s ? JSON.parse(s) : [];
-  }catch(e){ state.sessions = []; }
-  try{
-    const a = localStorage.getItem(LS_PREFIX+'activeSession');
-    state.activeSession = a ? JSON.parse(a) : null;
-  }catch(e){ state.activeSession = null; }
+    await ensureAuth();
+    const snap = await userDocRef.get();
+    const data = snap.exists ? snap.data() : {};
+    state.exerciseList = (data.exerciseList && data.exerciseList.length) ? data.exerciseList : defaultExerciseList();
+    state.sessions = data.sessions || [];
+    state.activeSession = data.activeSession || null;
+    const statusEl = document.getElementById('syncStatus');
+    if(statusEl) statusEl.textContent = 'クラウドに保存されています';
+  }catch(e){
+    console.error('クラウド接続に失敗しました', e);
+    state.exerciseList = defaultExerciseList();
+    state.sessions = [];
+    state.activeSession = null;
+    const statusEl = document.getElementById('syncStatus');
+    if(statusEl) statusEl.textContent = 'クラウド接続に失敗しました（オフラインの可能性）';
+  }
 }
 async function saveExerciseList(){
-  try{ localStorage.setItem(LS_PREFIX+'exerciseList', JSON.stringify(state.exerciseList)); }
+  try{ await userDocRef.set({exerciseList: state.exerciseList}, {merge:true}); }
   catch(e){ console.error('保存に失敗しました', e); }
 }
 async function saveSessions(){
-  try{ localStorage.setItem(LS_PREFIX+'sessions', JSON.stringify(state.sessions)); }
+  try{ await userDocRef.set({sessions: state.sessions}, {merge:true}); }
   catch(e){ console.error('保存に失敗しました', e); }
 }
 async function saveActive(){
   try{
-    if(state.activeSession){
-      localStorage.setItem(LS_PREFIX+'activeSession', JSON.stringify(state.activeSession));
-    }else{
-      localStorage.removeItem(LS_PREFIX+'activeSession');
-    }
+    await userDocRef.set({activeSession: state.activeSession || null}, {merge:true});
   }catch(e){ console.error('保存に失敗しました', e); }
 }
 
