@@ -295,40 +295,41 @@ body{
   box-shadow:0 -4px 12px rgba(0,0,0,0.3);
 }
 .fixed-timer-bar.alert{border-top:1px solid var(--danger);background:#2a1c1c;}
-.rest-row{display:flex;align-items:center;gap:10px;}
-.rest-presets{display:flex;gap:6px;flex-shrink:0;}
-.rest-preset{
-  padding:6px 10px;
+.rest-row{display:flex;align-items:center;gap:8px;}
+.rest-select{
   background:var(--plate-raised);
   border:1px solid var(--line);
-  border-radius:20px;
-  font-size:11px;
-  color:var(--steel);
-  cursor:pointer;
+  border-radius:var(--radius);
+  color:var(--brass-bright);
+  padding:9px 6px;
+  font-size:13px;
+  font-weight:700;
+  flex-shrink:0;
 }
-.rest-preset.selected{border-color:var(--brass-bright);color:var(--brass-bright);}
 .rest-time{
   font-family:"Arial Narrow",Arial,sans-serif;
-  font-size:30px;
+  font-size:28px;
   font-weight:800;
   color:var(--brass-bright);
   letter-spacing:1px;
   flex:1;
+  min-width:0;
   text-align:center;
 }
 .fixed-timer-bar.alert .rest-time{color:var(--danger);}
 .rest-btn{
-  padding:10px 16px;
+  padding:10px 14px;
   border-radius:var(--radius);
   border:none;
-  font-size:13px;
+  font-size:12px;
   font-weight:700;
   cursor:pointer;
   flex-shrink:0;
+  white-space:nowrap;
 }
 .rest-btn.start{background:var(--brass);color:var(--iron);}
 .rest-btn.reset{background:transparent;border:1px solid var(--line);color:var(--steel);}
-body.has-fixed-timer{padding-bottom:80px;}
+body.has-fixed-timer{padding-bottom:96px;}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -359,12 +360,17 @@ body.has-fixed-timer{padding-bottom:80px;}
 
 <div class="fixed-timer-bar" id="fixedTimerBar" style="display:none;">
   <div class="rest-row">
-    <div class="rest-presets" id="restPresets">
-      <div class="rest-preset" data-sec="60">60秒</div>
-      <div class="rest-preset selected" data-sec="90">90秒</div>
-      <div class="rest-preset" data-sec="120">120秒</div>
-      <div class="rest-preset" data-sec="180">180秒</div>
-    </div>
+    <select class="rest-select" id="restSecSelect">
+      <option value="30">30秒</option>
+      <option value="45">45秒</option>
+      <option value="60">60秒</option>
+      <option value="90" selected>90秒</option>
+      <option value="120">120秒</option>
+      <option value="150">150秒</option>
+      <option value="180">180秒</option>
+      <option value="240">240秒</option>
+      <option value="300">300秒</option>
+    </select>
     <div class="rest-time" id="restTimeDisplay">01:30</div>
     <button class="rest-btn reset" id="restResetBtn">リセット</button>
     <button class="rest-btn start" id="restStartBtn">開始</button>
@@ -728,23 +734,19 @@ function renderRestDisplay(){
 }
 
 function initRestTimer(){
-  const presetsEl = document.getElementById('restPresets');
-  if(!presetsEl) return;
-  presetsEl.querySelectorAll('.rest-preset').forEach(btn=>{
-    btn.onclick = ()=>{
-      if(restHandle) clearInterval(restHandle);
-      restHandle = null;
-      restRunning = false;
-      restSelectedSec = parseInt(btn.dataset.sec);
-      restRemaining = restSelectedSec;
-      presetsEl.querySelectorAll('.rest-preset').forEach(b=>b.classList.remove('selected'));
-      btn.classList.add('selected');
-      document.getElementById('restStartBtn').textContent = '開始';
-      const bar = document.getElementById('fixedTimerBar');
-      if(bar) bar.classList.remove('alert');
-      renderRestDisplay();
-    };
-  });
+  const selectEl = document.getElementById('restSecSelect');
+  if(!selectEl) return;
+  selectEl.onchange = ()=>{
+    if(restHandle) clearInterval(restHandle);
+    restHandle = null;
+    restRunning = false;
+    restSelectedSec = parseInt(selectEl.value);
+    restRemaining = restSelectedSec;
+    document.getElementById('restStartBtn').textContent = '開始';
+    const bar = document.getElementById('fixedTimerBar');
+    if(bar) bar.classList.remove('alert');
+    renderRestDisplay();
+  };
 
   const startBtn = document.getElementById('restStartBtn');
   const resetBtn = document.getElementById('restResetBtn');
@@ -986,7 +988,10 @@ function renderHistory(){
       html += `</div>`;
     });
     html += `
-      <button class="btn-ghost btn-sm hist-copy" style="width:100%;margin-top:12px;">この日の記録をコピー</button>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn-ghost btn-sm hist-copy" style="flex:1;">この日の記録をコピー</button>
+        <button class="btn-danger btn-sm hist-delete" style="flex:0 0 auto;">削除</button>
+      </div>
       </div></div>`;
   });
   html += '</div>';
@@ -1012,6 +1017,14 @@ function renderHistory(){
         copyBtn.textContent = 'コピーに失敗しました';
       }
       setTimeout(()=>{ copyBtn.textContent = 'この日の記録をコピー'; }, 1800);
+    };
+    const deleteBtn = item.querySelector('.hist-delete');
+    deleteBtn.onclick = async (e)=>{
+      e.stopPropagation();
+      if(!confirm('この日の記録を削除しますか？元に戻せません。')) return;
+      state.sessions = state.sessions.filter(s=>s.id!==id);
+      await saveSessions();
+      renderHistory();
     };
   });
 }
