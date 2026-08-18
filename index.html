@@ -400,13 +400,22 @@ let state = {
 
 // ---------- storage (Firebase Firestore にクラウド保存) ----------
 async function ensureAuth(){
+  try{
+    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+  }catch(e){
+    console.error('永続化設定に失敗しました', e);
+  }
   return new Promise((resolve, reject)=>{
     auth.onAuthStateChanged(user=>{
       if(user){
         userDocRef = db.collection('trainLogUsers').doc(user.uid);
+        try{ localStorage.setItem('trainLogUid', user.uid); }catch(e){}
         resolve();
       }
     });
+    if(auth.currentUser){
+      return;
+    }
     auth.signInAnonymously().catch(reject);
   });
 }
