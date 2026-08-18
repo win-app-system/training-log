@@ -617,6 +617,7 @@ function renderTraining(){
   let html = `
   <div class="card">
     <div class="card-title">本日のメニュー（${s.exercises.length}種目）</div>
+    <div class="timer" id="timerDisplay">00:00:00</div>
   `;
   s.exercises.forEach((ex,exi)=>{
     html += `<div class="exercise" data-exi="${exi}">
