@@ -22,7 +22,10 @@
 *{box-sizing:border-box;}
 body{
   margin:0;
-  background:var(--iron);
+  background-color:var(--iron);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cg fill='none' stroke='%238a94a6' stroke-opacity='0.05' stroke-width='3'%3E%3Cg transform='translate(20,25) rotate(-20)'%3E%3Crect x='0' y='6' width='46' height='6' rx='2'/%3E%3Crect x='-8' y='0' width='10' height='18' rx='2'/%3E%3Crect x='44' y='0' width='10' height='18' rx='2'/%3E%3C/g%3E%3Cg transform='translate(70,95) rotate(20)'%3E%3Crect x='0' y='6' width='46' height='6' rx='2'/%3E%3Crect x='-8' y='0' width='10' height='18' rx='2'/%3E%3Crect x='44' y='0' width='10' height='18' rx='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(ellipse at top, rgba(255,255,255,0.03), transparent 60%);
   color:var(--chalk);
   font-family:-apple-system,"Hiragino Sans","Yu Gothic",sans-serif;
   min-height:100vh;
@@ -318,9 +321,9 @@ const db = firebase.firestore();
 let userDocRef = null;
 
 let state = {
-  exerciseList: [],   // [{id,name,target}]
+  exerciseList: [],
   sessions: [],
-  activeSession: null, // {startTs, exercises:[{id,name,target,sets:[{weight,reps}]}]}
+  activeSession: null,
   timerHandle: null
 };
 
@@ -571,12 +574,10 @@ function renderTraining(){
   </div>`;
   el.innerHTML = html;
 
-  // timer
   updateTimerDisplay();
   if(state.timerHandle) clearInterval(state.timerHandle);
   state.timerHandle = setInterval(updateTimerDisplay, 1000);
 
-  // bind exercise blocks
   el.querySelectorAll('.exercise').forEach(exEl=>{
     const exi = parseInt(exEl.dataset.exi);
     exEl.querySelector('.add-set').onclick = async ()=>{
