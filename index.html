@@ -283,6 +283,52 @@ body{
   border:1px dashed var(--line);border-radius:var(--radius);
 }
 .footer-note{text-align:center;font-size:10px;color:var(--steel);margin-top:24px;letter-spacing:1px;}
+.fixed-timer-bar{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  background:var(--plate);
+  border-top:1px solid var(--brass);
+  padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+  z-index:100;
+  box-shadow:0 -4px 12px rgba(0,0,0,0.3);
+}
+.fixed-timer-bar.alert{border-top:1px solid var(--danger);background:#2a1c1c;}
+.rest-row{display:flex;align-items:center;gap:10px;}
+.rest-presets{display:flex;gap:6px;flex-shrink:0;}
+.rest-preset{
+  padding:6px 10px;
+  background:var(--plate-raised);
+  border:1px solid var(--line);
+  border-radius:20px;
+  font-size:11px;
+  color:var(--steel);
+  cursor:pointer;
+}
+.rest-preset.selected{border-color:var(--brass-bright);color:var(--brass-bright);}
+.rest-time{
+  font-family:"Arial Narrow",Arial,sans-serif;
+  font-size:30px;
+  font-weight:800;
+  color:var(--brass-bright);
+  letter-spacing:1px;
+  flex:1;
+  text-align:center;
+}
+.fixed-timer-bar.alert .rest-time{color:var(--danger);}
+.rest-btn{
+  padding:10px 16px;
+  border-radius:var(--radius);
+  border:none;
+  font-size:13px;
+  font-weight:700;
+  cursor:pointer;
+  flex-shrink:0;
+}
+.rest-btn.start{background:var(--brass);color:var(--iron);}
+.rest-btn.reset{background:transparent;border:1px solid var(--line);color:var(--steel);}
+body.has-fixed-timer{padding-bottom:80px;}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -309,6 +355,20 @@ body{
   <div id="view-history" style="display:none"></div>
 
   <div class="footer-note" id="syncStatus">クラウドに接続中...</div>
+</div>
+
+<div class="fixed-timer-bar" id="fixedTimerBar" style="display:none;">
+  <div class="rest-row">
+    <div class="rest-presets" id="restPresets">
+      <div class="rest-preset" data-sec="60">60秒</div>
+      <div class="rest-preset selected" data-sec="90">90秒</div>
+      <div class="rest-preset" data-sec="120">120秒</div>
+      <div class="rest-preset" data-sec="180">180秒</div>
+    </div>
+    <div class="rest-time" id="restTimeDisplay">01:30</div>
+    <button class="rest-btn reset" id="restResetBtn">リセット</button>
+    <button class="rest-btn start" id="restStartBtn">開始</button>
+  </div>
 </div>
 
 <script>
@@ -540,6 +600,7 @@ function lastRecordFor(exerciseName){
 function renderTraining(){
   const el = document.getElementById('view-training');
   const s = state.activeSession;
+  setFixedTimerVisible(!!s);
   if(!s){
     el.innerHTML = `<div class="card">
       <div class="card-title">本日のメニュー</div>
@@ -550,7 +611,6 @@ function renderTraining(){
   let html = `
   <div class="card">
     <div class="card-title">本日のメニュー（${s.exercises.length}種目）</div>
-    <div class="timer" id="timerDisplay">00:00:00</div>
   `;
   s.exercises.forEach((ex,exi)=>{
     html += `<div class="exercise" data-exi="${exi}">
@@ -645,8 +705,93 @@ function updateTimerDisplay(){
   const h = String(Math.floor(diff/3600)).padStart(2,'0');
   const m = String(Math.floor((diff%3600)/60)).padStart(2,'0');
   const sec = String(diff%60).padStart(2,'0');
+  const timeStr = `${h}:${m}:${sec}`;
   const d = document.getElementById('timerDisplay');
-  if(d) d.textContent = `${h}:${m}:${sec}`;
+  if(d) d.textContent = timeStr;
+}
+
+// ---------- rest timer (インターバルタイマー) ----------
+let restSelectedSec = 90;
+let restRemaining = 90;
+let restHandle = null;
+let restRunning = false;
+
+function formatRestTime(sec){
+  const m = String(Math.floor(sec/60)).padStart(2,'0');
+  const s = String(sec%60).padStart(2,'0');
+  return `${m}:${s}`;
+}
+
+function renderRestDisplay(){
+  const disp = document.getElementById('restTimeDisplay');
+  if(disp) disp.textContent = formatRestTime(Math.max(restRemaining,0));
+}
+
+function initRestTimer(){
+  const presetsEl = document.getElementById('restPresets');
+  if(!presetsEl) return;
+  presetsEl.querySelectorAll('.rest-preset').forEach(btn=>{
+    btn.onclick = ()=>{
+      if(restHandle) clearInterval(restHandle);
+      restHandle = null;
+      restRunning = false;
+      restSelectedSec = parseInt(btn.dataset.sec);
+      restRemaining = restSelectedSec;
+      presetsEl.querySelectorAll('.rest-preset').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      document.getElementById('restStartBtn').textContent = '開始';
+      const bar = document.getElementById('fixedTimerBar');
+      if(bar) bar.classList.remove('alert');
+      renderRestDisplay();
+    };
+  });
+
+  const startBtn = document.getElementById('restStartBtn');
+  const resetBtn = document.getElementById('restResetBtn');
+  if(startBtn) startBtn.onclick = ()=>{
+    if(restRunning){
+      clearInterval(restHandle);
+      restHandle = null;
+      restRunning = false;
+      startBtn.textContent = '再開';
+      return;
+    }
+    const bar = document.getElementById('fixedTimerBar');
+    if(bar) bar.classList.remove('alert');
+    restRunning = true;
+    startBtn.textContent = '一時停止';
+    restHandle = setInterval(()=>{
+      restRemaining--;
+      renderRestDisplay();
+      if(restRemaining<=0){
+        clearInterval(restHandle);
+        restHandle = null;
+        restRunning = false;
+        startBtn.textContent = '開始';
+        const bar2 = document.getElementById('fixedTimerBar');
+        if(bar2) bar2.classList.add('alert');
+        if(navigator.vibrate) navigator.vibrate([300,100,300,100,300]);
+      }
+    },1000);
+  };
+  if(resetBtn) resetBtn.onclick = ()=>{
+    if(restHandle) clearInterval(restHandle);
+    restHandle = null;
+    restRunning = false;
+    restRemaining = restSelectedSec;
+    startBtn.textContent = '開始';
+    const bar = document.getElementById('fixedTimerBar');
+    if(bar) bar.classList.remove('alert');
+    renderRestDisplay();
+  };
+  renderRestDisplay();
+}
+
+function setFixedTimerVisible(visible){
+  const bar = document.getElementById('fixedTimerBar');
+  if(!bar) return;
+  bar.style.display = visible ? 'block' : 'none';
+  document.body.classList.toggle('has-fixed-timer', visible);
 }
 
 async function finishSession(){
@@ -884,6 +1029,23 @@ document.querySelectorAll('.tab').forEach(tab=>{
   };
 });
 
+// ---------- 画面スリープ防止 ----------
+let wakeLock = null;
+async function requestWakeLock(){
+  try{
+    if('wakeLock' in navigator){
+      wakeLock = await navigator.wakeLock.request('screen');
+    }
+  }catch(e){
+    console.error('スリープ防止に失敗しました', e);
+  }
+}
+document.addEventListener('visibilitychange', async ()=>{
+  if(document.visibilityState === 'visible'){
+    await requestWakeLock();
+  }
+});
+
 // ---------- init ----------
 (async function init(){
   await loadAll();
@@ -892,6 +1054,8 @@ document.querySelectorAll('.tab').forEach(tab=>{
   renderSelect();
   renderMenu();
   renderHistory();
+  initRestTimer();
+  requestWakeLock();
 })();
 </script>
 </body>
