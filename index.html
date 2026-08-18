@@ -554,8 +554,16 @@ function renderTraining(){
   `;
   s.exercises.forEach((ex,exi)=>{
     html += `<div class="exercise" data-exi="${exi}">
-      <div class="exercise-name">${escapeHtml(ex.name)}</div>
-      ${ex.target?`<div class="exercise-last">${escapeHtml(ex.target)}</div>`:''}
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div>
+          <div class="exercise-name">${escapeHtml(ex.name)}</div>
+          ${ex.target?`<div class="exercise-last">${escapeHtml(ex.target)}</div>`:''}
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0;">
+          <button class="ex-move-up btn-ghost btn-sm" style="padding:6px 10px;" ${exi===0?'disabled':''}>▲</button>
+          <button class="ex-move-down btn-ghost btn-sm" style="padding:6px 10px;" ${exi===s.exercises.length-1?'disabled':''}>▼</button>
+        </div>
+      </div>
       <div class="sets-wrap">`;
     ex.sets.forEach((st,sti)=>{
       html += `
@@ -603,6 +611,20 @@ function renderTraining(){
       };
     });
     exEl.querySelector('.memo-input').oninput = (e)=>{ s.exercises[exi].memo = e.target.value; saveActive(); };
+    const upBtn = exEl.querySelector('.ex-move-up');
+    const downBtn = exEl.querySelector('.ex-move-down');
+    if(upBtn) upBtn.onclick = async ()=>{
+      if(exi===0) return;
+      [s.exercises[exi-1], s.exercises[exi]] = [s.exercises[exi], s.exercises[exi-1]];
+      await saveActive();
+      renderTraining();
+    };
+    if(downBtn) downBtn.onclick = async ()=>{
+      if(exi===s.exercises.length-1) return;
+      [s.exercises[exi+1], s.exercises[exi]] = [s.exercises[exi], s.exercises[exi+1]];
+      await saveActive();
+      renderTraining();
+    };
   });
 
   document.getElementById('cancelBtn').onclick = async ()=>{
